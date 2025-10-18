@@ -475,6 +475,15 @@ const recordMovie = () => {
         isAnimationEnabled = true;
         uiControls.animateToggle.checked = true;
     }
+
+    let parsedTotalSteps = parseInt(uiControls.totalSteps.value, 10);
+    if (!Number.isFinite(parsedTotalSteps) || parsedTotalSteps <= 0) {
+        parsedTotalSteps = 500;
+        uiControls.totalSteps.value = parsedTotalSteps;
+    }
+
+    const needsRestart = !wasDrawing || currentStep >= parsedTotalSteps;
+
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
     if (!wasDrawing) {
         draw();
