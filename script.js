@@ -68,6 +68,7 @@ let fpsInterval = 1000 / 15;
 let then = performance.now();
 let drawStyle = 'orbit';
 let animationEnabledBeforeCapture = null;
+let capturedFrameCount = 0;
 
 // --- 4. HELPER AND UI FUNCTIONS ---
 
@@ -94,7 +95,6 @@ function calculateSpirographSteps() {
     const integerPeriods = speeds.map(s => Math.round((360 * multiplier) / (s * multiplier)));
     const totalSteps = integerPeriods.reduce((acc, current) => lcm(acc, current), 1);
     uiControls.revolutionStepsLabel.textContent = `${totalSteps} steps`;
-    uiControls.totalSteps.value = 1000;
 }
 
 function createPlanetEditor() {
@@ -462,29 +462,53 @@ const saveImage = () => {
 };
 
 const recordMovie = () => {
-    if (isDrawing || capturer) return alert("Please wait for other operations to finish.");
+    if (capturer) {
+        finishCapture();
+        return;
+    }
     if (typeof CCapture === 'undefined') {
         alert('Recording is unavailable because the CCapture library failed to load.');
         return;
     }
+    const wasDrawing = isDrawing && !isDrawingCancelled;
     animationEnabledBeforeCapture = isAnimationEnabled;
     if (!isAnimationEnabled) {
         isAnimationEnabled = true;
         uiControls.animateToggle.checked = true;
     }
+
+    let parsedTotalSteps = parseInt(uiControls.totalSteps.value, 10);
+    if (!Number.isFinite(parsedTotalSteps) || parsedTotalSteps <= 0) {
+        parsedTotalSteps = 500;
+        uiControls.totalSteps.value = parsedTotalSteps;
+    }
+
+    const needsRestart = !wasDrawing || currentStep >= parsedTotalSteps;
+
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-    draw();
+    capturedFrameCount = 0;
+    if (needsRestart) {
+        draw();
+    }
     capturer.start();
-    uiControls.recordMovieBtn.textContent = "RECORDING...";
+    uiControls.recordMovieBtn.textContent = "Stop Recording";
     uiControls.recordMovieBtn.style.backgroundColor = '#ffc107';
-    uiControls.recordMovieBtn.disabled = true;
+    uiControls.recordMovieBtn.disabled = false;
 };
 
 function finishCapture() {
     if (!capturer) return;
+    if (capturedFrameCount === 0) {
+        const size = new THREE.Vector2();
+        renderer.getSize(size);
+        renderScene(size.x, size.y);
+        capturer.capture(renderer.domElement);
+        capturedFrameCount++;
+    }
     capturer.stop();
     capturer.save();
     capturer = null;
+    capturedFrameCount = 0;
     if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
         isAnimationEnabled = animationEnabledBeforeCapture;
         uiControls.animateToggle.checked = animationEnabledBeforeCapture;
@@ -626,6 +650,7 @@ const animate = () => {
         renderScene(width, height);
         if (capturer && isDrawing) {
             capturer.capture(renderer.domElement);
+            capturedFrameCount++;
         }
     }
 };
