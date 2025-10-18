@@ -68,6 +68,7 @@ let fpsInterval = 1000 / 15;
 let then = performance.now();
 let drawStyle = 'orbit';
 let animationEnabledBeforeCapture = null;
+let capturedFrameCount = 0;
 
 // --- 4. HELPER AND UI FUNCTIONS ---
 
@@ -496,9 +497,17 @@ const recordMovie = () => {
 
 function finishCapture() {
     if (!capturer) return;
+    if (capturedFrameCount === 0) {
+        const size = new THREE.Vector2();
+        renderer.getSize(size);
+        renderScene(size.x, size.y);
+        capturer.capture(renderer.domElement);
+        capturedFrameCount++;
+    }
     capturer.stop();
     capturer.save();
     capturer = null;
+    capturedFrameCount = 0;
     if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
         isAnimationEnabled = animationEnabledBeforeCapture;
         uiControls.animateToggle.checked = animationEnabledBeforeCapture;
@@ -640,6 +649,7 @@ const animate = () => {
         renderScene(width, height);
         if (capturer && isDrawing) {
             capturer.capture(renderer.domElement);
+            capturedFrameCount++;
         }
     }
 };
