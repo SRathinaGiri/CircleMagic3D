@@ -483,11 +483,16 @@ const recordMovie = () => {
         uiControls.totalSteps.value = parsedTotalSteps;
     }
 
-    const needsRestart = !wasDrawing || currentStep >= parsedTotalSteps;
+    const needsRestart = !wasDrawing || isDrawingCancelled || currentStep >= parsedTotalSteps;
 
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-    if (!wasDrawing) {
+    capturedFrameCount = 0;
+
+    if (needsRestart) {
         draw();
+    } else {
+        isDrawing = true;
+        isDrawingCancelled = false;
     }
     capturer.start();
     uiControls.recordMovieBtn.textContent = "Stop Recording";
