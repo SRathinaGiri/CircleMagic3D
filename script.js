@@ -94,7 +94,7 @@ function calculateSpirographSteps() {
     const integerPeriods = speeds.map(s => Math.round((360 * multiplier) / (s * multiplier)));
     const totalSteps = integerPeriods.reduce((acc, current) => lcm(acc, current), 1);
     uiControls.revolutionStepsLabel.textContent = `${totalSteps} steps`;
-    uiControls.totalSteps.value = totalSteps;
+    uiControls.totalSteps.value = 1000;
 }
 
 function createPlanetEditor() {
