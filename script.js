@@ -489,7 +489,12 @@ const recordMovie = () => {
     const needsRestart = !wasDrawing || isDrawingCancelled || currentStep >= parsedTotalSteps;
 
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
+    capturer.start();
     capturedFrameCount = 0;
+
+    uiControls.recordMovieBtn.textContent = "Stop Recording";
+    uiControls.recordMovieBtn.style.backgroundColor = '#c62828';
+    uiControls.recordMovieBtn.disabled = false;
 
     if (needsRestart) {
         draw();
