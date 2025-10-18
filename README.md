@@ -27,7 +27,7 @@ Features
 
     High-Quality Export:
 
-        Save stunning, high-resolution 4K images of your final patterns.
+        Save images at whatever resolution you configure for the canvas.
 
         Record animations as smooth, high-quality WebM video files.
 
@@ -123,9 +123,9 @@ Stereoscopic 3D Controls
 
 Exporting Your Creation
 
-    Save 4K Image: Renders the complete pattern at 3840x2160 resolution and downloads it as a PNG file.
+    Save Image: Renders the complete pattern using the current canvas dimensions (stereo mode doubles the width) and downloads it as a PNG file.
 
-    Record Movie: Records the animation as it plays and saves it as a WebM video file. Click the button to start, and the video will be saved automatically when the animation finishes.
+    Record Movie: Records the animation at the current canvas resolution and saves it as a WebM video file. Click the button to start, and the video will be saved automatically when the animation finishes.
 
     Export/Import Params: Save your entire system configuration (all planets and settings) to a JSON file, and load it back in later.
 
