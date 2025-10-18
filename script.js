@@ -486,8 +486,7 @@ const recordMovie = () => {
     const needsRestart = !wasDrawing || currentStep >= parsedTotalSteps;
 
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-    capturedFrameCount = 0;
-    if (needsRestart) {
+    if (!wasDrawing) {
         draw();
     }
     capturer.start();
