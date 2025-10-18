@@ -488,49 +488,14 @@ const recordMovie = () => {
 
     const needsRestart = !wasDrawing || isDrawingCancelled || currentStep >= parsedTotalSteps;
 
-    const mediaPatch = window.__CCaptureMediaPatch;
-    mediaPatch?.ensureRedefinable?.();
+    capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
+    capturedFrameCount = 0;
 
-    let newCapturer = null;
-    try {
-        newCapturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-        capturedFrameCount = 0;
-
-        if (needsRestart) {
-            draw();
-        } else {
-            isDrawing = true;
-            isDrawingCancelled = false;
-        }
-
-        newCapturer.start();
-        mediaPatch?.resetDefineProperty?.();
-
-        capturer = newCapturer;
-        uiControls.recordMovieBtn.textContent = "Stop Recording";
-        uiControls.recordMovieBtn.style.backgroundColor = '#ffc107';
-        uiControls.recordMovieBtn.disabled = false;
-    } catch (error) {
-        console.error('Failed to start movie capture', error);
-        mediaPatch?.restoreOriginalDescriptors?.();
-        mediaPatch?.resetDefineProperty?.();
-        if (newCapturer) {
-            try {
-                newCapturer.stop();
-            } catch (stopError) {
-                console.error('Error while cleaning up failed capture session', stopError);
-            }
-        }
-        if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
-            isAnimationEnabled = animationEnabledBeforeCapture;
-            uiControls.animateToggle.checked = animationEnabledBeforeCapture;
-        }
-        animationEnabledBeforeCapture = null;
-        capturer = null;
-        uiControls.recordMovieBtn.textContent = "Record Movie";
-        uiControls.recordMovieBtn.style.backgroundColor = '';
-        uiControls.recordMovieBtn.disabled = false;
-        alert('Failed to start recording. Please check the console for details.');
+    if (needsRestart) {
+        draw();
+    } else {
+        isDrawing = true;
+        isDrawingCancelled = false;
     }
 };
 
