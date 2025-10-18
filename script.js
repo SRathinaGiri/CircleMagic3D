@@ -470,6 +470,9 @@ const recordMovie = () => {
         alert('Recording is unavailable because the CCapture library failed to load.');
         return;
     }
+
+    uiControls.recordMovieBtn.disabled = true;
+
     const wasDrawing = isDrawing && !isDrawingCancelled;
     animationEnabledBeforeCapture = isAnimationEnabled;
     if (!isAnimationEnabled) {
@@ -494,10 +497,6 @@ const recordMovie = () => {
         isDrawing = true;
         isDrawingCancelled = false;
     }
-    capturer.start();
-    uiControls.recordMovieBtn.textContent = "Stop Recording";
-    uiControls.recordMovieBtn.style.backgroundColor = '#ffc107';
-    uiControls.recordMovieBtn.disabled = false;
 };
 
 function finishCapture() {
@@ -513,6 +512,8 @@ function finishCapture() {
     capturer.save();
     capturer = null;
     capturedFrameCount = 0;
+    const mediaPatch = window.__CCaptureMediaPatch;
+    mediaPatch?.restoreOriginalDescriptors?.();
     if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
         isAnimationEnabled = animationEnabledBeforeCapture;
         uiControls.animateToggle.checked = animationEnabledBeforeCapture;
