@@ -24,7 +24,7 @@ const uiControls = {
     resetBtn: document.getElementById('resetBtn'),
     stopBtn: document.getElementById('stopBtn'),
     addPlanetBtn: document.getElementById('addPlanetBtn'),
-    saveHiResBtn: document.getElementById('saveHiResBtn'),
+    saveImageBtn: document.getElementById('saveImageBtn'),
     recordMovieBtn: document.getElementById('recordMovieBtn'),
     exportBtn: document.getElementById('exportBtn'),
     importFile: document.getElementById('importFile'),
@@ -67,6 +67,7 @@ let isAnimationEnabled = true;
 let fpsInterval = 1000 / 15;
 let then = performance.now();
 let drawStyle = 'orbit';
+let animationEnabledBeforeCapture = null;
 
 // --- 4. HELPER AND UI FUNCTIONS ---
 
@@ -425,33 +426,52 @@ const fullRender = (onComplete) => {
     }
 };
 
-const saveHiResImage = () => {
+const saveImage = () => {
     if (isDrawing || capturer) return alert("Please wait for other operations to finish.");
     const originalSize = new THREE.Vector2();
     renderer.getSize(originalSize);
-    const highResWidth = 3840;
-    const highResHeight = 2160;
-    renderer.setSize(highResWidth, highResHeight, false);
-    const baseAspect = (isStereoEnabled ? highResWidth / 2 : highResWidth) / highResHeight;
-    camera.aspect = baseAspect;
+    const currentStereoFactor = isStereoEnabled ? 2 : 1;
+    let baseWidth = parseInt(uiControls.canvasWidth.value, 10);
+    let baseHeight = parseInt(uiControls.canvasHeight.value, 10);
+    if (isNaN(baseWidth) || baseWidth <= 0) {
+        baseWidth = Math.max(1, Math.round(originalSize.x / currentStereoFactor));
+    }
+    if (isNaN(baseHeight) || baseHeight <= 0) {
+        baseHeight = Math.max(1, Math.round(originalSize.y));
+    }
+    const targetWidth = baseWidth * currentStereoFactor;
+    const targetHeight = baseHeight;
+    renderer.setSize(targetWidth, targetHeight, false);
+    const originalAspect = camera.aspect;
+    camera.aspect = baseWidth / baseHeight;
     camera.updateProjectionMatrix();
     fullRender(() => {
-        renderScene(highResWidth, highResHeight);
+        renderScene(targetWidth, targetHeight);
         const dataURL = renderer.domElement.toDataURL('image/png');
         const link = document.createElement('a');
-        link.download = 'circle-magic-4k.png';
+        const downloadName = `circle-magic-${baseWidth}x${baseHeight}${isStereoEnabled ? '-stereo' : ''}.png`;
+        link.download = downloadName;
         link.href = dataURL;
         link.click();
         renderer.setSize(originalSize.x, originalSize.y, false);
-        const originalBaseAspect = (isStereoEnabled ? originalSize.x / 2 : originalSize.x) / originalSize.y;
-        camera.aspect = originalBaseAspect;
+        camera.aspect = originalAspect;
         camera.updateProjectionMatrix();
+        renderScene(originalSize.x, originalSize.y);
         draw();
     });
 };
 
 const recordMovie = () => {
     if (isDrawing || capturer) return alert("Please wait for other operations to finish.");
+    if (typeof CCapture === 'undefined') {
+        alert('Recording is unavailable because the CCapture library failed to load.');
+        return;
+    }
+    animationEnabledBeforeCapture = isAnimationEnabled;
+    if (!isAnimationEnabled) {
+        isAnimationEnabled = true;
+        uiControls.animateToggle.checked = true;
+    }
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
     draw();
     capturer.start();
@@ -460,10 +480,36 @@ const recordMovie = () => {
     uiControls.recordMovieBtn.disabled = true;
 };
 
+function finishCapture() {
+    if (!capturer) return;
+    capturer.stop();
+    capturer.save();
+    capturer = null;
+    if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
+        isAnimationEnabled = animationEnabledBeforeCapture;
+        uiControls.animateToggle.checked = animationEnabledBeforeCapture;
+    }
+    animationEnabledBeforeCapture = null;
+    uiControls.recordMovieBtn.textContent = "Record Movie";
+    uiControls.recordMovieBtn.style.backgroundColor = '';
+    uiControls.recordMovieBtn.disabled = false;
+}
+
 function setCanvasSize() {
-    const baseWidth = parseInt(uiControls.canvasWidth.value);
-    const baseHeight = parseInt(uiControls.canvasHeight.value);
-    const finalWidth = isStereoEnabled ? baseWidth * 2 : baseWidth;
+    const size = new THREE.Vector2();
+    renderer.getSize(size);
+    const stereoFactor = isStereoEnabled ? 2 : 1;
+    let baseWidth = parseInt(uiControls.canvasWidth.value, 10);
+    let baseHeight = parseInt(uiControls.canvasHeight.value, 10);
+    if (isNaN(baseWidth) || baseWidth <= 0) {
+        baseWidth = Math.max(1, Math.round(size.x / stereoFactor));
+        uiControls.canvasWidth.value = baseWidth;
+    }
+    if (isNaN(baseHeight) || baseHeight <= 0) {
+        baseHeight = Math.max(1, Math.round(size.y));
+        uiControls.canvasHeight.value = baseHeight;
+    }
+    const finalWidth = baseWidth * stereoFactor;
     renderer.setSize(finalWidth, baseHeight);
     camera.aspect = baseWidth / baseHeight;
     camera.updateProjectionMatrix();
@@ -567,12 +613,7 @@ const animate = () => {
             }
         }
         if (capturer && !isDrawing && currentStep >= totalSteps) {
-            capturer.stop();
-            capturer.save();
-            capturer = null;
-            uiControls.recordMovieBtn.textContent = "Record Movie";
-            uiControls.recordMovieBtn.style.backgroundColor = '';
-            uiControls.recordMovieBtn.disabled = false;
+            finishCapture();
         }
         camera.fov = parseFloat(uiControls.fov.value);
         camera.focus = parseFloat(uiControls.focalDistance.value);
@@ -618,8 +659,9 @@ uiControls.addPlanetBtn.addEventListener('click', addPlanet);
 uiControls.stopBtn.addEventListener('click', () => {
     isDrawingCancelled = true;
     isDrawing = false;
+    finishCapture();
 });
-uiControls.saveHiResBtn.addEventListener('click', saveHiResImage);
+uiControls.saveImageBtn.addEventListener('click', saveImage);
 uiControls.recordMovieBtn.addEventListener('click', recordMovie);
 uiControls.exportBtn.addEventListener('click', exportParams);
 uiControls.importFile.addEventListener('change', importParams);
