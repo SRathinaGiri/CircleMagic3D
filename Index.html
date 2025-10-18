@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Circle Magic - 3D Studio</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="main-container">
+    <div id="controls">
+        <h2>CircleMagic 3D</h2>
+
+        <div class="control-section">
+            <h3>Canvas Size</h3>
+            <div class="control-group">
+                <label>Width</label><input type="number" id="canvasWidth" value="1024">
+            </div>
+            <div class="control-group">
+                <label>Height</label><input type="number" id="canvasHeight" value="768">
+            </div>
+            <button id="applySizeBtn">Apply Size</button>
+        </div>
+
+
+        <div class="control-section">
+            <h3>Actions</h3>
+            <button id="drawBtn">Draw</button>
+            <button id="randomBtn">Random</button>
+            <button id="resetBtn">Reset</button>
+            <button id="stopBtn">Stop</button>
+        </div>
+      <div class="control-group">
+        <label>Draw Style</label>
+        <select id="drawStyleSelector">
+            <option value="orbit">Draw Orbital Paths</option>
+            <option value="connect">Draw Connecting Lines</option>
+        </select>
+      </div>
+
+        <div class="control-section">
+            <h3>Planets</h3>
+            <button id="addPlanetBtn" class="full-width">Add New Planet</button>
+            <div class="control-group-row">
+                <select id="planetSelector"></select>
+                <button id="removePlanetBtn" title="Remove Selected Planet">X</button>
+            </div>
+        </div>
+
+        <div id="planet-editor" class="control-section"></div>
+
+        <div class="control-section">
+            <h3>View Options</h3>
+          <div class="control-group-checkbox">
+              <input type="checkbox" id="animateToggle" checked>
+              <label for="animateToggle">Enable Animation</label>
+          </div>
+         <div class="control-group">
+             <label>FPS</label>
+             <input type="range" id="fpsSlider" min="1" max="60" value="15" step="1">
+             <span id="fpsValue">15</span>
+         </div>          
+            
+            <div class="control-group">
+                <label>Total Steps</label><input type="number" id="totalSteps" value="2000" step="100">
+            </div>
+          <div class="control-group">
+              <label>Full Revolution:</label>
+              <span id="revolutionStepsLabel" style="font-weight: bold;">- steps</span>
+          </div>
+            
+            <div class="control-group">
+                <label>Background</label><input type="color" id="backColor" value="#000000">
+            </div>
+            <div class="control-group-checkbox">
+                <input type="checkbox" id="stereoToggle" checked>
+                <label for="stereoToggle">Enable Stereo View</label>
+            </div>
+            <button id="swapViewsBtn">Swap L/R (Cross-View)</button>
+             <div class="control-group">
+                <label>FOV</label><input type="range" id="fov" min="20" max="120" value="75"><span id="fovValue">75</span>
+            </div>
+            <div class="control-group">
+                <label>Focal Distance</label><input type="range" id="focalDistance" min="10" max="5000" value="500" step="10"><span id="focalValue">500</span>
+            </div>
+            <div class="control-group">
+                <label>Eye Separation</label><input type="range" id="eyeSeparation" min="0" max="20" value="0.5" step="0.05"><span id="eyeSepValue">0.50</span>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <h3>Export</h3>
+            <button id="saveHiResBtn">Save 4K Image</button>
+            <button id="recordMovieBtn">Record Movie</button>
+            <button id="exportBtn">Export Params</button>
+            <label class="button-like-label" for="importFile">Import Params</label>
+            <input type="file" id="importFile" accept=".json" style="display: none;">
+        </div>
+        
+        <progress id="progressBar" value="0" max="100"></progress>
+    </div>
+
+    <div id="canvas-container">
+        <div id="stereo-overlay">
+            <div class="view-border"></div>
+            <div class="view-border"></div>
+        </div>
+    </div>
+</div>
+
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+        }
+    }
+</script>
+<script type="module" src="script.js"></script>
+</body>
+</html>
