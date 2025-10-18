@@ -94,7 +94,6 @@ function calculateSpirographSteps() {
     const integerPeriods = speeds.map(s => Math.round((360 * multiplier) / (s * multiplier)));
     const totalSteps = integerPeriods.reduce((acc, current) => lcm(acc, current), 1);
     uiControls.revolutionStepsLabel.textContent = `${totalSteps} steps`;
-    uiControls.totalSteps.value = 1000;
 }
 
 function createPlanetEditor() {
@@ -462,22 +461,37 @@ const saveImage = () => {
 };
 
 const recordMovie = () => {
-    if (isDrawing || capturer) return alert("Please wait for other operations to finish.");
+    if (capturer) {
+        finishCapture();
+        return;
+    }
     if (typeof CCapture === 'undefined') {
         alert('Recording is unavailable because the CCapture library failed to load.');
         return;
     }
+    const wasDrawing = isDrawing && !isDrawingCancelled;
     animationEnabledBeforeCapture = isAnimationEnabled;
     if (!isAnimationEnabled) {
         isAnimationEnabled = true;
         uiControls.animateToggle.checked = true;
     }
+
+    let parsedTotalSteps = parseInt(uiControls.totalSteps.value, 10);
+    if (!Number.isFinite(parsedTotalSteps) || parsedTotalSteps <= 0) {
+        parsedTotalSteps = 500;
+        uiControls.totalSteps.value = parsedTotalSteps;
+    }
+
+    const needsRestart = !wasDrawing || currentStep >= parsedTotalSteps;
+
     capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-    draw();
+    if (needsRestart) {
+        draw();
+    }
     capturer.start();
-    uiControls.recordMovieBtn.textContent = "RECORDING...";
+    uiControls.recordMovieBtn.textContent = "Stop Recording";
     uiControls.recordMovieBtn.style.backgroundColor = '#ffc107';
-    uiControls.recordMovieBtn.disabled = true;
+    uiControls.recordMovieBtn.disabled = false;
 };
 
 function finishCapture() {
