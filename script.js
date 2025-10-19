@@ -6,51 +6,17 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, 1024 / 768, 0.1, 20000);
 const stereoCamera = new THREE.StereoCamera();
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-
 const canvasContainer = document.getElementById('canvas-container');
 canvasContainer.appendChild(renderer.domElement);
-
 const sunMesh = new THREE.Mesh(new THREE.SphereGeometry(10, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
 scene.add(sunMesh);
-
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 orbitControls.enableDamping = true;
 camera.position.z = 500;
 
 // --- 2. SETUP UI CONTROLS ---
 const uiControls = {
-    drawBtn: document.getElementById('drawBtn'),
-    randomBtn: document.getElementById('randomBtn'),
-    resetBtn: document.getElementById('resetBtn'),
-    stopBtn: document.getElementById('stopBtn'),
-    addPlanetBtn: document.getElementById('addPlanetBtn'),
-    saveImageBtn: document.getElementById('saveImageBtn'),
-    recordMovieBtn: document.getElementById('recordMovieBtn'),
-    exportBtn: document.getElementById('exportBtn'),
-    importFile: document.getElementById('importFile'),
-    totalSteps: document.getElementById('totalSteps'),
-    fov: document.getElementById('fov'),
-    focalDistance: document.getElementById('focalDistance'),
-    eyeSeparation: document.getElementById('eyeSeparation'),
-    fovValue: document.getElementById('fovValue'),
-    focalValue: document.getElementById('focalValue'),
-    eyeSepValue: document.getElementById('eyeSepValue'),
-    backColor: document.getElementById('backColor'),
-    progressBar: document.getElementById('progressBar'),
-    stereoToggle: document.getElementById('stereoToggle'),
-    swapViewsBtn: document.getElementById('swapViewsBtn'),
-    stereoOverlay: document.getElementById('stereo-overlay'),
-    canvasWidth: document.getElementById('canvasWidth'),
-    canvasHeight: document.getElementById('canvasHeight'),
-    applySizeBtn: document.getElementById('applySizeBtn'),
-    planetSelector: document.getElementById('planetSelector'),
-    planetEditorContainer: document.getElementById('planet-editor'),
-    removePlanetBtn: document.getElementById('removePlanetBtn'),
-    animateToggle: document.getElementById('animateToggle'),
-    revolutionStepsLabel: document.getElementById('revolutionStepsLabel'),
-    fpsSlider: document.getElementById('fpsSlider'),
-    fpsValue: document.getElementById('fpsValue'),
-    drawStyleSelector: document.getElementById('drawStyleSelector'),
+    drawBtn: document.getElementById('drawBtn'), randomBtn: document.getElementById('randomBtn'), resetBtn: document.getElementById('resetBtn'), stopBtn: document.getElementById('stopBtn'), addPlanetBtn: document.getElementById('addPlanetBtn'), saveHiResBtn: document.getElementById('saveHiResBtn'), recordMovieBtn: document.getElementById('recordMovieBtn'), exportBtn: document.getElementById('exportBtn'), importFile: document.getElementById('importFile'), totalSteps: document.getElementById('totalSteps'), fov: document.getElementById('fov'), focalDistance: document.getElementById('focalDistance'), eyeSeparation: document.getElementById('eyeSeparation'), fovValue: document.getElementById('fovValue'), focalValue: document.getElementById('focalValue'), eyeSepValue: document.getElementById('eyeSepValue'), backColor: document.getElementById('backColor'), progressBar: document.getElementById('progressBar'), stereoToggle: document.getElementById('stereoToggle'), swapViewsBtn: document.getElementById('swapViewsBtn'), stereoOverlay: document.getElementById('stereo-overlay'), canvasWidth: document.getElementById('canvasWidth'), canvasHeight: document.getElementById('canvasHeight'), applySizeBtn: document.getElementById('applySizeBtn'), planetSelector: document.getElementById('planetSelector'), planetEditorContainer: document.getElementById('planet-editor'), removePlanetBtn: document.getElementById('removePlanetBtn'), animateToggle: document.getElementById('animateToggle'), revolutionStepsLabel: document.getElementById('revolutionStepsLabel'), fpsSlider: document.getElementById('fpsSlider'), fpsValue: document.getElementById('fpsValue'), drawStyleSelector: document.getElementById('drawStyleSelector'), recordFormatSelector: document.getElementById('recordFormatSelector'),
 };
 
 // --- 3. CORE LOGIC AND STATE ---
@@ -59,7 +25,6 @@ let temporaryObjects = [];
 let isDrawing = false;
 let isDrawingCancelled = false;
 let currentStep = 0;
-let capturer = null;
 let isStereoEnabled = true;
 let isViewSwapped = false;
 let selectedPlanetIndex = 0;
@@ -67,48 +32,30 @@ let isAnimationEnabled = true;
 let fpsInterval = 1000 / 15;
 let then = performance.now();
 let drawStyle = 'orbit';
-let animationEnabledBeforeCapture = null;
-let capturedFrameCount = 0;
+
+// --- NEW: State variables for MediaRecorder ---
+let mediaRecorder = null;
+let recordedChunks = [];
+let isRecording = false;
 
 // --- 4. HELPER AND UI FUNCTIONS ---
-
-function gcd(a, b) {
-    return b === 0 ? a : gcd(b, a % b);
-}
-
-function lcm(a, b) {
-    if (a === 0 || b === 0) return 0;
-    return Math.abs(a * b) / gcd(a, b);
-}
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function lcm(a, b) { if (a === 0 || b === 0) return 0; return Math.abs(a * b) / gcd(a, b); }
 
 function calculateSpirographSteps() {
-    if (planets.length === 0) {
-        uiControls.revolutionStepsLabel.textContent = '- steps';
-        return;
-    }
+    if (planets.length === 0) { uiControls.revolutionStepsLabel.textContent = '- steps'; return; }
     const speeds = planets.map(p => p.speed).filter(s => s !== 0);
-    if (speeds.length === 0) {
-        uiControls.revolutionStepsLabel.textContent = 'Infinite steps';
-        return;
-    }
+    if (speeds.length === 0) { uiControls.revolutionStepsLabel.textContent = 'Infinite steps'; return; }
     const multiplier = 100;
     const integerPeriods = speeds.map(s => Math.round((360 * multiplier) / (s * multiplier)));
-    const totalSteps = integerPeriods.reduce((acc, current) => lcm(acc, current), 1);
+    let totalSteps = integerPeriods.reduce((acc, current) => lcm(acc, current), 1);
+    if (!Number.isFinite(totalSteps) || totalSteps <= 0) { totalSteps = 2000; }
     uiControls.revolutionStepsLabel.textContent = `${totalSteps} steps`;
+    uiControls.totalSteps.value = 500;
 }
 
 function createPlanetEditor() {
-    uiControls.planetEditorContainer.innerHTML = `
-        <h3>Selected Planet Properties</h3>
-        <div class="control-group"><label>Dist X</label><input type="number" id="editDistX"></div>
-        <div class="control-group"><label>Dist Y</label><input type="number" id="editDistY"></div>
-        <div class="control-group"><label>Speed</label><input type="number" id="editSpeed" step="0.1"></div>
-        <div class="control-group"><label>Inclination</label><input type="range" id="editInclination" min="0" max="90" step="1"></div>
-        <div class="control-group"><label>Azimuth</label><input type="range" id="editAzimuth" min="0" max="360" step="1"></div>
-        <div class="control-group"><label>Planet Radius</label><input type="number" id="editRadius" min="0"></div>
-        <div class="control-group"><label>Color</label><input type="color" id="editColor"></div>
-        <div class="control-group"><label>Parent Body</label><select id="editParent"></select></div>
-    `;
+    uiControls.planetEditorContainer.innerHTML = `<h3>Selected Planet Properties</h3><div class="control-group"><label>Dist X</label><input type="number" id="editDistX"></div><div class="control-group"><label>Dist Y</label><input type="number" id="editDistY"></div><div class="control-group"><label>Speed</label><input type="number" id="editSpeed" step="0.1"></div><div class="control-group"><label>Inclination</label><input type="range" id="editInclination" min="0" max="90" step="1"></div><div class="control-group"><label>Azimuth</label><input type="range" id="editAzimuth" min="0" max="360" step="1"></div><div class="control-group"><label>Planet Radius</label><input type="number" id="editRadius" min="0"></div><div class="control-group"><label>Color</label><input type="color" id="editColor"></div><div class="control-group"><label>Parent Body</label><select id="editParent"></select></div>`;
     const fields = ['DistX', 'DistY', 'Speed', 'Inclination', 'Azimuth', 'Radius', 'Color', 'Parent'];
     const propMap = { 'DistX': 'distanceX', 'DistY': 'distanceY', 'Speed': 'speed', 'Inclination': 'inclination', 'Azimuth': 'azimuth', 'Radius': 'radius', 'Color': 'color', 'Parent': 'parent' };
     fields.forEach(field => {
@@ -118,12 +65,8 @@ function createPlanetEditor() {
                 const prop = propMap[field];
                 const value = e.target.type === 'color' ? e.target.value : parseFloat(e.target.value);
                 planets[selectedPlanetIndex][prop] = isNaN(value) ? e.target.value : value;
-                if (prop === 'speed') {
-                    calculateSpirographSteps();
-                }
-                if (prop === 'parent') {
-                    populateParentOptions(document.getElementById('editParent'));
-                }
+                if (prop === 'speed') { calculateSpirographSteps(); }
+                if (prop === 'parent') { populateParentOptions(document.getElementById('editParent')); }
             }
         });
     });
@@ -155,10 +98,7 @@ function populateParentOptions(selectElement) {
 
 function populateEditor() {
     const planet = planets[selectedPlanetIndex];
-    if (!planet) {
-        uiControls.planetEditorContainer.style.display = 'none';
-        return;
-    }
+    if (!planet) { uiControls.planetEditorContainer.style.display = 'none'; return; }
     uiControls.planetEditorContainer.style.display = 'block';
     document.getElementById('editDistX').value = planet.distanceX;
     document.getElementById('editDistY').value = planet.distanceY;
@@ -179,21 +119,9 @@ function updatePlanetUI() {
 }
 
 const resetSystem = () => {
-    isDrawing = false;
-    isDrawingCancelled = true;
-    currentStep = 0;
-    uiControls.progressBar.value = 0;
+    isDrawing = false; isDrawingCancelled = true; currentStep = 0; uiControls.progressBar.value = 0;
     clearScene();
-    planets = [{
-        distanceX: 150,
-        distanceY: 150,
-        speed: 1,
-        color: '#ffffff',
-        parent: -1,
-        inclination: 0,
-        azimuth: 0,
-        radius: 5
-    }];
+    planets = [{ distanceX: 150, distanceY: 150, speed: 1, color: '#ffffff', parent: -1, inclination: 0, azimuth: 0, radius: 5 }];
     selectedPlanetIndex = 0;
     updatePlanetUI();
     const size = new THREE.Vector2();
@@ -204,33 +132,24 @@ const resetSystem = () => {
 const addPlanet = () => {
     const lastPlanet = planets[planets.length - 1];
     planets.push({
-        distanceX: lastPlanet ? Math.round(lastPlanet.distanceX / 2) : 150,
-        distanceY: lastPlanet ? Math.round(lastPlanet.distanceY / 2) : 150,
-        speed: lastPlanet ? lastPlanet.speed + 1 : 1,
-        color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`,
-        parent: planets.length > 1 ? planets.length - 2 : -1,
-        inclination: 0, azimuth: 0, radius: 5
+        distanceX: lastPlanet ? Math.round(lastPlanet.distanceX / 2) : 150, distanceY: lastPlanet ? Math.round(lastPlanet.distanceY / 2) : 150,
+        speed: lastPlanet ? lastPlanet.speed + 1 : 1, color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`,
+        parent: planets.length > 1 ? planets.length - 2 : -1, inclination: 0, azimuth: 0, radius: 5
     });
     selectedPlanetIndex = planets.length - 1;
     updatePlanetUI();
 };
 
 const drawRandom = () => {
-    isDrawing = false;
-    isDrawingCancelled = true;
+    isDrawing = false; isDrawingCancelled = true;
     clearScene();
     const numPlanets = Math.floor(Math.random() * 3) + 2;
     planets = [];
     for (let i = 0; i < numPlanets; i++) {
         planets.push({
-            distanceX: Math.floor(Math.random() * 200) + 50,
-            distanceY: Math.floor(Math.random() * 200) + 50,
-            speed: parseFloat((Math.random() * 5 + 0.1).toFixed(1)),
-            color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`,
-            parent: i === 0 ? -1 : Math.floor(Math.random() * i),
-            inclination: Math.floor(Math.random() * 90),
-            azimuth: Math.floor(Math.random() * 360),
-            radius: Math.floor(Math.random() * 5) + 2,
+            distanceX: Math.floor(Math.random() * 200) + 50, distanceY: Math.floor(Math.random() * 200) + 50, speed: parseFloat((Math.random() * 5 + 0.1).toFixed(1)),
+            color: `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`, parent: i === 0 ? -1 : Math.floor(Math.random() * i),
+            inclination: Math.floor(Math.random() * 90), azimuth: Math.floor(Math.random() * 360), radius: Math.floor(Math.random() * 5) + 2,
         });
     }
     selectedPlanetIndex = 0;
@@ -306,18 +225,10 @@ function calculatePositionsAtStep(step) {
     return positions;
 }
 
-
 const draw = () => {
-    isDrawing = false;
-    isDrawingCancelled = true;
-    isDrawing = true;
-    isDrawingCancelled = false;
-    uiControls.progressBar.value = 0;
-    currentStep = 0;
+    isDrawing = true; isDrawingCancelled = false; uiControls.progressBar.value = 0; currentStep = 0;
     clearScene();
-
     const totalSteps = parseInt(uiControls.totalSteps.value);
-
     planets.forEach(planet => {
         const sphereGeometry = new THREE.SphereGeometry(planet.radius, 16, 16);
         const sphereMaterial = new THREE.MeshBasicMaterial({ color: planet.color });
@@ -325,7 +236,6 @@ const draw = () => {
         planet.sphereObject.visible = (drawStyle === 'orbit');
         scene.add(planet.sphereObject);
     });
-
     if (drawStyle === 'connect') {
         const numPlanets = planets.length;
         const numSegmentsPerStep = (numPlanets * (numPlanets - 1)) / 2;
@@ -338,7 +248,7 @@ const draw = () => {
         const lineSegments = new THREE.LineSegments(segmentGeometry, segmentMaterial);
         scene.add(lineSegments);
         temporaryObjects.push(lineSegments);
-    } else { // 'orbit' style
+    } else {
         planets.forEach(planet => {
             const trailGeometry = new THREE.BufferGeometry();
             const positions = new Float32Array(totalSteps * 3);
@@ -351,29 +261,20 @@ const draw = () => {
 };
 
 const fullRender = (onComplete) => {
-    isDrawing = false;
-    isDrawingCancelled = true;
-    uiControls.progressBar.value = 0;
+    isDrawing = false; isDrawingCancelled = true; uiControls.progressBar.value = 0;
     clearScene();
     const totalSteps = parseInt(uiControls.totalSteps.value);
-
     const allPlanetPositions = [];
     planets.forEach(() => allPlanetPositions.push([]));
     for (let i = 0; i < totalSteps; i++) {
         const currentFramePositions = calculatePositionsAtStep(i);
         for (let p_idx = 0; p_idx < planets.length; p_idx++) {
-            if (currentFramePositions[p_idx]) {
-                allPlanetPositions[p_idx].push(currentFramePositions[p_idx]);
-            }
+            if (currentFramePositions[p_idx]) { allPlanetPositions[p_idx].push(currentFramePositions[p_idx]); }
         }
     }
-
     if (drawStyle === 'connect') {
         sunMesh.visible = false;
-        const segments = [];
-        const colors = [];
-        const tempColor = new THREE.Color();
-
+        const segments = []; const colors = []; const tempColor = new THREE.Color();
         for (let i = 0; i < totalSteps; i++) {
             for (let j = 0; j < planets.length; j++) {
                 for (let k = j + 1; k < planets.length; k++) {
@@ -402,7 +303,6 @@ const fullRender = (onComplete) => {
             const sphereMaterial = new THREE.MeshBasicMaterial({ color: planet.color });
             planet.sphereObject = new THREE.Mesh(sphereGeometry, sphereMaterial);
             scene.add(planet.sphereObject);
-
             const allPoints = allPlanetPositions[p_idx].flatMap(p => [p.x, p.y, p.z]);
             const trailGeometry = new THREE.BufferGeometry();
             trailGeometry.setAttribute('position', new THREE.Float32BufferAttribute(allPoints, 3));
@@ -415,135 +315,91 @@ const fullRender = (onComplete) => {
             }
         });
     }
-
     uiControls.progressBar.value = 100;
-    if (onComplete) {
-        onComplete();
-    } else {
-        const size = new THREE.Vector2();
-        renderer.getSize(size);
-        renderScene(size.x, size.y);
-    }
+    if (onComplete) { onComplete(); }
+    else { const size = new THREE.Vector2(); renderer.getSize(size); renderScene(size.x, size.y); }
 };
 
 const saveImage = () => {
-    if (isDrawing || capturer) return alert("Please wait for other operations to finish.");
-    const originalSize = new THREE.Vector2();
-    renderer.getSize(originalSize);
-    const currentStereoFactor = isStereoEnabled ? 2 : 1;
-    let baseWidth = parseInt(uiControls.canvasWidth.value, 10);
-    let baseHeight = parseInt(uiControls.canvasHeight.value, 10);
-    if (isNaN(baseWidth) || baseWidth <= 0) {
-        baseWidth = Math.max(1, Math.round(originalSize.x / currentStereoFactor));
-    }
-    if (isNaN(baseHeight) || baseHeight <= 0) {
-        baseHeight = Math.max(1, Math.round(originalSize.y));
-    }
-    const targetWidth = baseWidth * currentStereoFactor;
-    const targetHeight = baseHeight;
-    renderer.setSize(targetWidth, targetHeight, false);
-    const originalAspect = camera.aspect;
-    camera.aspect = baseWidth / baseHeight;
-    camera.updateProjectionMatrix();
+    if (isDrawing || isRecording) return alert("Please wait for other operations to finish.");
     fullRender(() => {
-        renderScene(targetWidth, targetHeight);
-        const dataURL = renderer.domElement.toDataURL('image/png');
-        const link = document.createElement('a');
-        const downloadName = `circle-magic-${baseWidth}x${baseHeight}${isStereoEnabled ? '-stereo' : ''}.png`;
-        link.download = downloadName;
-        link.href = dataURL;
-        link.click();
-        renderer.setSize(originalSize.x, originalSize.y, false);
-        camera.aspect = originalAspect;
-        camera.updateProjectionMatrix();
-        renderScene(originalSize.x, originalSize.y);
-        draw();
-    });
-};
-
-const recordMovie = () => {
-    if (capturer) {
-        finishCapture();
-        return;
-    }
-    if (typeof CCapture === 'undefined') {
-        alert('Recording is unavailable because the CCapture library failed to load.');
-        return;
-    }
-
-    uiControls.recordMovieBtn.disabled = true;
-
-    const wasDrawing = isDrawing && !isDrawingCancelled;
-    animationEnabledBeforeCapture = isAnimationEnabled;
-    if (!isAnimationEnabled) {
-        isAnimationEnabled = true;
-        uiControls.animateToggle.checked = true;
-    }
-
-    let parsedTotalSteps = parseInt(uiControls.totalSteps.value, 10);
-    if (!Number.isFinite(parsedTotalSteps) || parsedTotalSteps <= 0) {
-        parsedTotalSteps = 500;
-        uiControls.totalSteps.value = parsedTotalSteps;
-    }
-
-    const needsRestart = !wasDrawing || isDrawingCancelled || currentStep >= parsedTotalSteps;
-
-    capturer = new CCapture({ format: 'webm', framerate: 60, verbose: true, quality: 90 });
-    capturer.start();
-    capturedFrameCount = 0;
-
-    uiControls.recordMovieBtn.textContent = "Stop Recording";
-    uiControls.recordMovieBtn.style.backgroundColor = '#c62828';
-    uiControls.recordMovieBtn.disabled = false;
-
-    if (needsRestart) {
-        draw();
-    } else {
-        isDrawing = true;
-        isDrawingCancelled = false;
-    }
-};
-
-function finishCapture() {
-    if (!capturer) return;
-    if (capturedFrameCount === 0) {
         const size = new THREE.Vector2();
         renderer.getSize(size);
         renderScene(size.x, size.y);
-        capturer.capture(renderer.domElement);
-        capturedFrameCount++;
-    }
-    capturer.stop();
-    capturer.save();
-    capturer = null;
-    capturedFrameCount = 0;
-    const mediaPatch = window.__CCaptureMediaPatch;
-    mediaPatch?.restoreOriginalDescriptors?.();
-    if (animationEnabledBeforeCapture !== null && animationEnabledBeforeCapture !== isAnimationEnabled) {
-        isAnimationEnabled = animationEnabledBeforeCapture;
-        uiControls.animateToggle.checked = animationEnabledBeforeCapture;
-    }
-    animationEnabledBeforeCapture = null;
+        const dataURL = renderer.domElement.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.download = `circle-magic-${size.x}x${size.y}.png`;
+        link.href = dataURL;
+        link.click();
+    });
+};
+
+const stopRecording = () => {
+    if (!isRecording || !mediaRecorder) return;
+
+    mediaRecorder.stop();
+    isRecording = false;
     uiControls.recordMovieBtn.textContent = "Record Movie";
     uiControls.recordMovieBtn.style.backgroundColor = '';
-    uiControls.recordMovieBtn.disabled = false;
-}
+};
+
+const startRecording = () => {
+    if (isRecording) return;
+    if (typeof renderer.domElement.captureStream !== 'function' || typeof MediaRecorder === 'undefined') {
+        alert('Video recording is not supported in this browser.');
+        return;
+    }
+
+    isDrawing = false; isDrawingCancelled = true;
+    isAnimationEnabled = true; uiControls.animateToggle.checked = true;
+
+    const stream = renderer.domElement.captureStream(60);
+    
+    // --- MODIFIED LOGIC: Find the best supported format ---
+    const preferredTypes = [
+        'video/webm;codecs=vp9', 
+        'video/webm;codecs=vp8', 
+        'video/webm'
+    ];
+    const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type));
+
+    if (!mimeType) {
+        alert('No suitable WebM recording format is supported in this browser.');
+        return;
+    }
+    
+    console.log(`Using supported recording format: ${mimeType}`);
+
+    mediaRecorder = new MediaRecorder(stream, { mimeType });
+    recordedChunks = [];
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+    mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'circle-magic-recording.webm';
+        a.click();
+        URL.revokeObjectURL(url);
+        recordedChunks = [];
+    };
+
+    mediaRecorder.start();
+    isRecording = true;
+    uiControls.recordMovieBtn.textContent = 'Stop Recording';
+    uiControls.recordMovieBtn.style.backgroundColor = '#c62828';
+    
+    draw();
+};
 
 function setCanvasSize() {
-    const size = new THREE.Vector2();
-    renderer.getSize(size);
-    const stereoFactor = isStereoEnabled ? 2 : 1;
-    let baseWidth = parseInt(uiControls.canvasWidth.value, 10);
-    let baseHeight = parseInt(uiControls.canvasHeight.value, 10);
-    if (isNaN(baseWidth) || baseWidth <= 0) {
-        baseWidth = Math.max(1, Math.round(size.x / stereoFactor));
-        uiControls.canvasWidth.value = baseWidth;
-    }
-    if (isNaN(baseHeight) || baseHeight <= 0) {
-        baseHeight = Math.max(1, Math.round(size.y));
-        uiControls.canvasHeight.value = baseHeight;
-    }
-    const finalWidth = baseWidth * stereoFactor;
+    const baseWidth = parseInt(uiControls.canvasWidth.value);
+    const baseHeight = parseInt(uiControls.canvasHeight.value);
+    const finalWidth = isStereoEnabled ? baseWidth * 2 : baseWidth;
     renderer.setSize(finalWidth, baseHeight);
     camera.aspect = baseWidth / baseHeight;
     camera.updateProjectionMatrix();
@@ -574,20 +430,24 @@ const animate = () => {
     requestAnimationFrame(animate);
     const now = performance.now();
     const elapsed = now - then;
-    if (elapsed > fpsInterval) {
-        then = now - (elapsed % fpsInterval);
+
+    // We always run the animation logic, but throttle it if not recording
+    if (isRecording || elapsed > fpsInterval) {
+        if (!isRecording) {
+            then = now - (elapsed % fpsInterval);
+        }
         orbitControls.update();
         const size = new THREE.Vector2();
         renderer.getSize(size);
         const width = size.x;
         const height = size.y;
         const totalSteps = parseInt(uiControls.totalSteps.value);
+
         if (isAnimationEnabled && isDrawing && !isDrawingCancelled && currentStep < totalSteps) {
             const currentPositions = calculatePositionsAtStep(currentStep);
-
             if (drawStyle === 'connect') {
                 const lineSegments = temporaryObjects[0];
-                if(lineSegments) {
+                if (lineSegments) {
                     const positions = lineSegments.geometry.attributes.position.array;
                     const colors = lineSegments.geometry.attributes.color.array;
                     const numPlanets = planets.length;
@@ -600,21 +460,11 @@ const animate = () => {
                             const pos2 = currentPositions[k];
                             const index = (currentStep * segmentsPerStep + segmentCountThisStep) * 6;
                             if (pos1 && pos2 && index < positions.length) {
-                                positions[index] = pos1.x;
-                                positions[index+1] = pos1.y;
-                                positions[index+2] = pos1.z;
-                                positions[index+3] = pos2.x;
-                                positions[index+4] = pos2.y;
-                                positions[index+5] = pos2.z;
-                                
+                                positions[index] = pos1.x; positions[index + 1] = pos1.y; positions[index + 2] = pos1.z;
+                                positions[index + 3] = pos2.x; positions[index + 4] = pos2.y; positions[index + 5] = pos2.z;
                                 tempColor.set(planets[j].color);
-                                colors[index] = tempColor.r;
-                                colors[index+1] = tempColor.g;
-                                colors[index+2] = tempColor.b;
-                                colors[index+3] = tempColor.r;
-                                colors[index+4] = tempColor.g;
-                                colors[index+5] = tempColor.b;
-
+                                colors[index] = tempColor.r; colors[index + 1] = tempColor.g; colors[index + 2] = tempColor.b;
+                                colors[index + 3] = tempColor.r; colors[index + 4] = tempColor.g; colors[index + 5] = tempColor.b;
                                 segmentCountThisStep++;
                             }
                         }
@@ -630,7 +480,7 @@ const animate = () => {
                         planet.sphereObject.position.set(newPos.x, newPos.y, newPos.z);
                         const positions = planet.lineObject.geometry.attributes.position.array;
                         const index = currentStep * 3;
-                        if(index < positions.length) {
+                        if (index < positions.length) {
                             positions[index] = newPos.x;
                             positions[index + 1] = newPos.y;
                             positions[index + 2] = newPos.z;
@@ -644,11 +494,12 @@ const animate = () => {
             uiControls.progressBar.value = (currentStep / totalSteps) * 100;
             if (currentStep >= totalSteps) {
                 isDrawing = false;
+                if (isRecording) { // Automatically stop recording when animation finishes
+                    stopRecording();
+                }
             }
         }
-        if (capturer && !isDrawing && currentStep >= totalSteps) {
-            finishCapture();
-        }
+        
         camera.fov = parseFloat(uiControls.fov.value);
         camera.focus = parseFloat(uiControls.focalDistance.value);
         camera.updateProjectionMatrix();
@@ -658,10 +509,6 @@ const animate = () => {
         uiControls.eyeSepValue.textContent = stereoCamera.eyeSep.toFixed(2);
         renderer.setClearColor(uiControls.backColor.value);
         renderScene(width, height);
-        if (capturer && isDrawing) {
-            capturer.capture(renderer.domElement);
-            capturedFrameCount++;
-        }
     }
 };
 
@@ -682,6 +529,7 @@ uiControls.removePlanetBtn.addEventListener('click', () => {
     updatePlanetUI();
 });
 uiControls.drawBtn.addEventListener('click', () => {
+    isDrawing = false; isDrawingCancelled = true;
     if (isAnimationEnabled) {
         draw();
     } else {
@@ -694,10 +542,18 @@ uiControls.addPlanetBtn.addEventListener('click', addPlanet);
 uiControls.stopBtn.addEventListener('click', () => {
     isDrawingCancelled = true;
     isDrawing = false;
-    finishCapture();
+    if (isRecording) {
+        stopRecording();
+    }
 });
-uiControls.saveImageBtn.addEventListener('click', saveImage);
-uiControls.recordMovieBtn.addEventListener('click', recordMovie);
+uiControls.saveHiResBtn.addEventListener('click', saveImage);
+uiControls.recordMovieBtn.addEventListener('click', () => {
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+});
 uiControls.exportBtn.addEventListener('click', exportParams);
 uiControls.importFile.addEventListener('change', importParams);
 uiControls.stereoToggle.addEventListener('change', (e) => {
